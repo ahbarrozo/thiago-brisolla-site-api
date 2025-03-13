@@ -85,7 +85,6 @@ blogPosts.post('/', async (c) => {
             text: data.get('text')!.toString(),
         };
         const images: ImageDTO[] = JSON.parse(data.get('images')!.toString());
-        console.log(images.length)
         const blogPostQuery = await pool.query(`
             INSERT INTO blog_posts (title, subtitle, text)
             VALUES ($1, $2, $3)
@@ -93,7 +92,6 @@ blogPosts.post('/', async (c) => {
             [blogPost.title, blogPost.subtitle, blogPost.text]
         );
         const blogPostId = blogPostQuery.rows[0].id
-        console.log({blogPostId})
         const resultImagesPromises = images.map(async (image) => {
             const result = await pool.query(`
                 INSERT INTO images (description, path, title)
@@ -105,7 +103,6 @@ blogPosts.post('/', async (c) => {
         });
 
         const resultImages = await Promise.all(resultImagesPromises);
-        console.log({resultImages})    
         resultImages.forEach(async (imageId) => {
             await pool.query(`
                 INSERT INTO blog_posts_images (blog_post_id, image_id)
@@ -120,6 +117,103 @@ blogPosts.post('/', async (c) => {
     }
 });
 
+/**
+ *  POST request to create a new blog entry. It will insert the 
+ *  new rows at the blog_posts, blog_post_images and images tables
+ */
+blogPosts.put('/:id', async (c) => {
+    const pool: Pool = c.get('db');
+    const id = c.req.param('id');
 
+    try {
+        const checkBlogPost = await pool.query(`
+            SELECT id FROM blog_posts WHERE id = $1;`,
+            [id]);
+
+        if(checkBlogPost.rows.length === 0) {
+            return c.json({ error: 'Blog post not found' }, 404);
+        }
+        const data = await c.req.formData();
+        const blogPost: BlogPostDTO = {
+            title: data.get('title')!.toString(),
+            subtitle: data.get('subtitle')!.toString(),
+            text: data.get('text')!.toString(),
+        };
+        const images: ImageDTO[] = JSON.parse(data.get('images')!.toString());
+        const blogPostResults = await pool.query(`
+            UPDATE blog_posts 
+            SET title = $1, subtitle = $2, text = $3
+            WHERE id = $4
+            RETURNING id;`,
+            [blogPost.title, blogPost.subtitle, blogPost.text, id]
+        );
+
+        const blogPostsImagesResults = await pool.query(`
+            SELECT * FROM blog_posts_images WHERE blog_post_id = $1;`,
+            [id]
+        );
+
+        
+        const resultImagesPromises = images.map(async (image) => {
+            const result = await pool.query(`
+                INSERT INTO images (description, path, title)
+                VALUES ($1, $2, $3)
+                RETURNING id;`, 
+                [image.description, image.path, image.title]);
+
+            return result.rows[0].id;
+        });
+
+        const resultImages = await Promise.all(resultImagesPromises);
+        resultImages.forEach(async (imageId) => {
+            await pool.query(`
+                INSERT INTO blog_posts_images (blog_post_id, image_id)
+                VALUES ($1, $2);`,
+                [id, imageId]);
+        });
+
+        return c.json(resultImages, 201);
+    } catch (error) {
+        console.error('Database error: ', error);
+        return c.json({ error: 'Failed to insert new blog content into DB'}, 500);
+    }
+});
+
+blogPosts.delete('/:id', async (c) => {
+    const pool: Pool = c.get('db');
+    const id = c.req.param('id');
+
+    try {
+
+        const checkBlogPost = await pool.query(`
+            SELECT id FROM blog_posts WHERE id = $1;`,
+            [id]);
+        const checkBlogPostImages = await pool.query(`
+            SELECT blog_post_id FROM blog_posts_images WHERE blog_post_id = $1;`,
+            [id]);
+
+        if(checkBlogPost.rows.length === 0) {
+            return c.json({ error: 'Blog post not found' }, 404);
+        }
+
+        if(checkBlogPostImages.rows.length > 0) {
+            await pool.query(`
+                DELETE FROM blog_posts_images WHERE blog_post_id = $1`, 
+                [id]);
+        }
+
+        const resultBlogPost = await pool.query(`
+            DELETE FROM blog_posts WHERE id = $1 RETURNING id`, 
+            [id]);
+
+        return c.json({
+            message: 'Blog post deleted successfully',
+            id: resultBlogPost.rows[0].id
+        }, 200);
+    } catch (error) {
+        console.error('Error deleting blog post: ', error);
+        return c.json({ error: 'Failed to delete blog post' }, 500)
+    }
+});
 
 export default blogPosts;
