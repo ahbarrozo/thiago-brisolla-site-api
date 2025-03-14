@@ -6,6 +6,7 @@ export interface Image {
 }
 
 export interface ImageDTO {
+    id?: string;
     description?: string;
     path: string;
     title?: string;
