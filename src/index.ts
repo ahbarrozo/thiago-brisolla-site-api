@@ -8,6 +8,7 @@ import albums from './albums';
 import auth from './auth';
 import blogPosts from './blogPosts';
 import contacts from './contacts';
+import events from './events';
 import socialMedia from './socialMedia';
 
 const pool = new Pool({
@@ -32,15 +33,16 @@ app.route('/albums', albums);
 app.route('/auth', auth);
 app.route('/blog_posts', blogPosts);
 app.route('/contacts', contacts);
+app.route('/events', events);
 app.route('/social_media', socialMedia);
 
 app.get('/', (c) => {
-  return c.text('Hello Hono!')
+  return c.text('API connection established!')
 })
 
 // Run the server
 const server = Bun.serve({
-  port: process.env.PORT || 3000,
+  port: Bun.env.PORT || 3000,
   fetch: app.fetch,
   development: true, // Enable development mode
 });
