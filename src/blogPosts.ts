@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import { AppVariables } from './types/hono.types';
 import { Image, ImageDTO } from './types/Image.type';
 import { BlogPost, BlogPostDTO } from './types/BlogPost.type';
+import { authMiddleware } from './auth';
 
 const blogPosts = new Hono<{ Variables: AppVariables }>();
 
@@ -74,29 +75,35 @@ blogPosts.get('/', async (c) => {
  *  POST request to create a new blog entry. It will insert the 
  *  new rows at the blog_posts, blog_post_images and images tables
  */
-blogPosts.post('/', async (c) => {
+blogPosts.post('/', authMiddleware, async (c) => {
     const pool: Pool = c.get('db');
 
     try {
         const data = await c.req.formData();
         const blogPost: BlogPostDTO = {
             title: data.get('title')!.toString(),
-            subtitle: data.get('subtitle')!.toString(),
+            subtitle: data.get('subtitle')! && data.get('subtitle')!.toString(), // nullable field
             text: data.get('text')!.toString(),
         };
         const images: ImageDTO[] = JSON.parse(data.get('images')!.toString());
         const blogPostQuery = await pool.query(`
-            INSERT INTO blog_posts (title, subtitle, text)
-            VALUES ($1, $2, $3)
-            RETURNING id;`,
+            INSERT INTO 
+                blog_posts (title, subtitle, text)
+            VALUES 
+                ($1, $2, $3)
+            RETURNING 
+                id;`,
             [blogPost.title, blogPost.subtitle, blogPost.text]
         );
         const blogPostId = blogPostQuery.rows[0].id
         const resultImagesPromises = images.map(async (image) => {
             const result = await pool.query(`
-                INSERT INTO images (description, path, title)
-                VALUES ($1, $2, $3)
-                RETURNING id;`, 
+                INSERT INTO 
+                    images (description, path, title)
+                VALUES 
+                    ($1, $2, $3)
+                RETURNING 
+                    id;`, 
                 [image.description, image.path, image.title]);
 
             return result.rows[0].id;
@@ -105,8 +112,10 @@ blogPosts.post('/', async (c) => {
         const resultImages = await Promise.all(resultImagesPromises);
         resultImages.forEach(async (imageId) => {
             await pool.query(`
-                INSERT INTO blog_posts_images (blog_post_id, image_id)
-                VALUES ($1, $2);`,
+                INSERT INTO 
+                    blog_posts_images (blog_post_id, image_id)
+                VALUES 
+                    ($1, $2);`,
                 [blogPostId, imageId]);
         });
 
@@ -118,70 +127,127 @@ blogPosts.post('/', async (c) => {
 });
 
 /**
- *  POST request to create a new blog entry. It will insert the 
- *  new rows at the blog_posts, blog_post_images and images tables
+ *  PUT request to update a blog entry based on its ID. It will 
+ *  check its existence, fetch images associated with it, and update 
+ *  all the fields available at the submission form, images included, 
+ *  if needed
  */
-blogPosts.put('/:id', async (c) => {
+blogPosts.put('/:id', authMiddleware, async (c) => {
     const pool: Pool = c.get('db');
     const id = c.req.param('id');
 
     try {
         const checkBlogPost = await pool.query(`
-            SELECT id FROM blog_posts WHERE id = $1;`,
+            SELECT 
+                id 
+            FROM 
+                blog_posts 
+            WHERE 
+                id = $1;`,
             [id]);
 
         if(checkBlogPost.rows.length === 0) {
             return c.json({ error: 'Blog post not found' }, 404);
         }
+
         const data = await c.req.formData();
         const blogPost: BlogPostDTO = {
             title: data.get('title')!.toString(),
-            subtitle: data.get('subtitle')!.toString(),
+            subtitle: data.get('subtitle')! && data.get('subtitle')!.toString(), // nullable field
             text: data.get('text')!.toString(),
         };
         const images: ImageDTO[] = JSON.parse(data.get('images')!.toString());
-        const blogPostResults = await pool.query(`
-            UPDATE blog_posts 
-            SET title = $1, subtitle = $2, text = $3
-            WHERE id = $4
-            RETURNING id;`,
+
+        await pool.query(`
+            UPDATE 
+                blog_posts 
+            SET 
+                title = $1, subtitle = $2, text = $3
+            WHERE 
+                id = $4
+            RETURNING 
+                id;`,
             [blogPost.title, blogPost.subtitle, blogPost.text, id]
         );
-
+        
         const blogPostsImagesResults = await pool.query(`
-            SELECT * FROM blog_posts_images WHERE blog_post_id = $1;`,
+            SELECT 
+                bpi.image_id, bpi.blog_post_id, 
+                im.id, im.path, im.description, im.title 
+            FROM 
+                blog_posts_images bpi
+            LEFT JOIN 
+                images im ON im.id = bpi.image_id
+            WHERE 
+                bpi.blog_post_id = $1;`,
             [id]
         );
 
-        
-        const resultImagesPromises = images.map(async (image) => {
+        // separating between images to be deleted and upserted
+        const imagesToDelete = blogPostsImagesResults.
+                               rows.filter(im => 
+                                   !(images.map(i => i.id)).includes(im.image_id)
+                               );
+        const imagesToUpsert = images.filter(im => 
+                                   !im.id || !(imagesToDelete.map(i => i.id)).includes(im.id)
+                               );
+
+        imagesToDelete.forEach(async (im) => {
+            await pool.query(`
+                DELETE FROM 
+                    blog_posts_images 
+                WHERE 
+                    blog_post_id = $1 AND image_id = $2`, 
+                [id, im.id]);
+        });
+
+        // Check among images to insert if for no given ID. Else, update
+        const imageIds = imagesToUpsert.map(async (image) => {
+            if (!image.id) {
+                const result = await pool.query(`
+                    INSERT INTO 
+                        images (description, path, title)
+                    VALUES 
+                        ($1, $2, $3)
+                    RETURNING 
+                        id;`, 
+                    [image.description, image.path, image.title]);
+
+                await pool.query(`
+                    INSERT INTO 
+                        blog_posts_images (blog_post_id, image_id) 
+                    VALUES
+                        ($1, $2);`, 
+                    [id, result.rows[0].id]);
+
+                return result.rows[0].id;
+            }
+
             const result = await pool.query(`
-                INSERT INTO images (description, path, title)
-                VALUES ($1, $2, $3)
-                RETURNING id;`, 
-                [image.description, image.path, image.title]);
+                UPDATE 
+                    images 
+                SET 
+                    description = $1, path = $2, title = $3 
+                WHERE 
+                    id = $4 
+                RETURNING 
+                    id;`,
+                [image.description, image.path, image.title, image.id]);
 
             return result.rows[0].id;
         });
 
-        const resultImages = await Promise.all(resultImagesPromises);
-        resultImages.forEach(async (imageId) => {
-            await pool.query(`
-                INSERT INTO blog_posts_images (blog_post_id, image_id)
-                VALUES ($1, $2);`,
-                [id, imageId]);
-        });
-
-        return c.json(resultImages, 201);
+        return c.json({ message: `Blog post ${id} updated successfully` }, 200);
     } catch (error) {
         console.error('Database error: ', error);
         return c.json({ error: 'Failed to insert new blog content into DB'}, 500);
     }
 });
 
-blogPosts.delete('/:id', async (c) => {
+blogPosts.delete('/:id', authMiddleware, async (c) => {
     const pool: Pool = c.get('db');
     const id = c.req.param('id');
+
 
     try {
 
