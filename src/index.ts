@@ -2,8 +2,13 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { Pool } from 'pg';
 
-import blogPosts from './blogPosts';
 import { AppVariables } from './types/hono.types';
+import aboutSections from './aboutSections';
+import albums from './albums';
+import auth from './auth';
+import blogPosts from './blogPosts';
+import contacts from './contacts';
+import socialMedia from './socialMedia';
 
 const pool = new Pool({
     user: Bun.env.DB_USER,
@@ -22,7 +27,12 @@ app.use('*', async (c, next) => {
 });
 app.use('/', cors());
 
+app.route('/about_sections', aboutSections);
+app.route('/albums', albums);
+app.route('/auth', auth);
 app.route('/blog_posts', blogPosts);
+app.route('/contacts', contacts);
+app.route('/social_media', socialMedia);
 
 app.get('/', (c) => {
   return c.text('Hello Hono!')
