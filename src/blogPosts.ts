@@ -30,6 +30,7 @@ blogPosts.get('/', async (c) => {
                 images im ON bpi.image_id = im.id
             ORDER BY
                 bp.date
+            DESC;
         `);
 
         const blogPosts = result.rows.reduce((rows, row) => {
@@ -240,7 +241,7 @@ blogPosts.put('/:id', authMiddleware, async (c) => {
         return c.json({ message: `Blog post ${id} updated successfully` }, 200);
     } catch (error) {
         console.error('Database error: ', error);
-        return c.json({ error: 'Failed to insert new blog content into DB'}, 500);
+        return c.json({ error: 'Failed to update blog content into DB'}, 500);
     }
 });
 
