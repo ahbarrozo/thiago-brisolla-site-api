@@ -43,17 +43,18 @@ albums.get('/', async (c) => {
 
             if (existingAlbum) {
                 if (image)
-                    existingAlbum.image = image;
+                    existingAlbum.images.push(image);
             } else {
                 const album: Album = {
                     id: row.id,
                     date: row.date,
                     description: row.description,
-                    title: row.title
+                    title: row.title,
+                    images: []
                 }
 
                 if (image)
-                    album.image = image;
+                    album.images.push(image);
 
                 rows.push(album);
             }

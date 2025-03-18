@@ -27,7 +27,9 @@ aboutSections.get('/', async (c) => {
             LEFT JOIN
                 about_sections_images asi ON asec.id = asi.about_section_id
             LEFT JOIN
-                images im ON asi.image_id = im.id;
+                images im ON asi.image_id = im.id
+            ORDER BY 
+                asec.id;
         `);
 
         const aboutSections = result.rows.reduce((rows, row) => {
@@ -43,15 +45,16 @@ aboutSections.get('/', async (c) => {
 
             if (existingAboutSection) {
                 if (image)
-                    existingAboutSection.image = image;
+                    existingAboutSection.images.push(image);
             } else {
                 const aboutSection: AboutSection = {
                     id: row.id,
-                    text: row.text
+                    text: row.text,
+                    images: []
                 }
 
                 if (image)
-                    aboutSection.image = image;
+                    aboutSection.images.push(image);
 
                 rows.push(aboutSection);
             }
@@ -87,7 +90,7 @@ aboutSections.post('/', authMiddleware, async (c) => {
                 id;`,
             [aboutSection.text]
         );
-        const aboutSectionId = aboutSectionQuery.rows[0].id
+        const aboutSectionId = aboutSectionQuery.rows[0].id;
         const resultImagesPromises = images.map(async (image) => {
             const result = await pool.query(`
                 INSERT INTO 
