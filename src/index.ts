@@ -26,7 +26,10 @@ app.use('*', async (c, next) => {
     c.set('db', pool);
     await next();
 });
-app.use('/', cors());
+app.use('*', cors({
+    origin: 'http://localhost',
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE']
+}));
 
 app.route('/about_sections', aboutSections);
 app.route('/albums', albums);
