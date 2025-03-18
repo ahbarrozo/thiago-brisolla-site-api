@@ -3,7 +3,7 @@ import { Image } from './Image.type';
 export interface AboutSection {
     id: number;
     text: string;
-    image?: Image;
+    images: Image[];
 }
 
 export interface AboutSectionDTO {

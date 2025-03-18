@@ -5,7 +5,7 @@ export interface Album {
     date: string;
     description: string;
     title: string;
-    image?: Image;
+    images: Image[];
 }
 
 export interface AlbumDTO {
