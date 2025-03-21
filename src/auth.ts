@@ -77,6 +77,20 @@ auth.post('/reset', async (c) => {
     }
 });
 
+auth.post('/verify_token', async (c) => {
+    try {
+        const data = await c.req.formData();
+        const token = data.get('token')?.toString();
+
+        const decoded = jwt.verify(token, JWT_SECRET);
+
+        return c.json({ message: 'Token is valid!' }, 200);
+    } catch (error) {
+        console.error('Error during token verification: ', error);
+        return c.json({ error: 'Token verification error'}, 500);
+    }
+});
+
 export const authMiddleware = async (c: Context<{ Variables: AppVariables }>, next: Next) => {
     const authHeader = c.req.header('Authorization');
   
