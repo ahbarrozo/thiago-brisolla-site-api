@@ -5,8 +5,8 @@ import { AppVariables } from './types/hono.types';
 import { User, UserLogin } from './types/User.type';
 
 const auth = new Hono<{ Variables: AppVariables }>();
-const JWT_SECRET: string = Bun.env.JWT_SECRET;
-const JWT_EXPIRES_IN: string = Bun.env.JWT_EXPIRES_IN;
+const JWT_SECRET = Bun.env.JWT_SECRET;
+const JWT_EXPIRES_IN = Bun.env.JWT_EXPIRES_IN;
 
 /**
  *  POST request to login. It will perform a check of username
@@ -36,6 +36,7 @@ auth.post('/login', async (c) => {
         const user: User = result.rows[0];
 
         // Generate JWT
+        // @ts-ignore
         const token = jwt.sign(
             { userId: user.id, email: user.email },
             JWT_SECRET,
