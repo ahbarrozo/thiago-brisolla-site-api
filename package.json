@@ -1,7 +1,10 @@
 {
   "name": "thiago-brisolla-site-api",
   "scripts": {
-    "dev": "bun run --watch src/index.ts"
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "prod": "NODE_ENV=production bun run dist/index.js"
   },
   "dependencies": {
     "@types/pg": "^8.11.11",
