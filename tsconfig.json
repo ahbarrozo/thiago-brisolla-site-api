@@ -12,7 +12,8 @@
     "allowJs": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true
+    "noEmit": false,
+    "outDir": "./dist"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules"]
