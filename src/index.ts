@@ -16,7 +16,10 @@ const pool = new Pool({
     host: Bun.env.DB_HOST,
     port: Number(Bun.env.DB_PORT),
     database: Bun.env.DB_NAME,
-    password: Bun.env.DB_PASSWORD
+    password: Bun.env.DB_PASSWORD,
+    ssl: {
+        rejectUnauthorized: true
+    }
 });
 
 const app = new Hono<{ Variables: AppVariables }>()
@@ -27,8 +30,8 @@ app.use('*', async (c, next) => {
     await next();
 });
 app.use('*', cors({
-    origin: Bun.env.ALLOWED_ORIGIN || 'http://localhost:5173',
-    allowMethods: ['GET', 'POST', 'PUT', 'DELETE']
+    origin: [Bun.env.ALLOWED_ORIGIN as string, 'http://localhost:5173'],
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 }));
 
 app.route('/about_sections', aboutSections);
