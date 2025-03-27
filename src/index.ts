@@ -27,7 +27,7 @@ app.use('*', async (c, next) => {
     await next();
 });
 app.use('*', cors({
-    origin: 'http://localhost',
+    origin: Bun.env.ALLOWED_ORIGIN || 'http://localhost:5173',
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE']
 }));
 
