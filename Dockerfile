@@ -18,9 +18,7 @@ WORKDIR /app
 
 # Copy only the built files and production dependencies
 COPY --from=build /app/dist /app/dist
-COPY --from=build /app/.env /app/
-COPY --from=build /app/package.json /app/
-COPY --from=build /app/node_modules /app/node_modules
+COPY --from=build /app/.env /app
 
 # Set production environment
 ENV NODE_ENV=production
