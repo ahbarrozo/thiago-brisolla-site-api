@@ -48,9 +48,9 @@ app.get('/', (c) => {
 
 // Run the server
 const server = Bun.serve({
-  port: Bun.env.PORT || 3000,
-  fetch: app.fetch,
-  development: true, // Enable development mode
+    port: Bun.env.PORT || 3000,
+    fetch: app.fetch,
+    hostname: "0.0.0.0"
 });
 
-console.log(`Server running at http://localhost:${server.port}`);
+console.log(`Server running at http://${server.hostname}:${server.port}`);
