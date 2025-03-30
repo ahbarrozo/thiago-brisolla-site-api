@@ -1,15 +1,9 @@
 FROM oven/bun:latest AS build
 
 WORKDIR /app
-
-# Copy package files and install dependencies
 COPY package.json bun.lock .env ./
-RUN bun install --frozen-lockfile
-
-# Copy source code
+RUN bun install
 COPY . .
-
-# Build the application
 RUN bun build src/index.ts --outdir dist --target bun
 
 # Production stage
