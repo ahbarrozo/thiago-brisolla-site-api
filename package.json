@@ -13,6 +13,7 @@
     "pg": "^8.14.0"
   },
   "devDependencies": {
+    "@flydotio/dockerfile": "^0.7.9",
     "@types/bun": "latest",
     "@types/jsonwebtoken": "^9.0.9"
   }
