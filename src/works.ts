@@ -19,7 +19,7 @@ works.get('/', async (c) => {
     try {
         const result = await pool.query(`
             SELECT 
-                wk.id, wk.date, wk.description, wk.title,  
+                wk.id, wk.date, wk.description, wk.title, wk.link,   
                 im.id AS image_id, im.path AS image_path,
                 im.title AS image_title, im.description AS image_description 
             FROM 
@@ -49,6 +49,7 @@ works.get('/', async (c) => {
                     id: row.id,
                     date: row.date,
                     description: row.description,
+                    link: row.link
                     title: row.title,
                     images: []
                 }
@@ -80,17 +81,18 @@ works.post('/', authMiddleware, async (c) => {
         const work: WorkDTO = {
             date: data.get('date')!.toString(),
             description: data.get('description')!.toString(),
+            link: data.get('link')!.toString(),
             title: data.get('title')!.toString(),
         };
         const images: ImageDTO[] = JSON.parse(data.get('images')!.toString());
         const workQuery = await pool.query(`
             INSERT INTO 
-                works (date, description, title)
+                works (date, description, link, title)
             VALUES 
-                ($1, $2, $3)
+                ($1, $2, $3, $4)
             RETURNING 
                 id;`,
-            [work.date, work.description, work.title]
+            [work.date, work.description, work.link, work.title]
         );
         const workId = workQuery.rows[0].id
         const resultImagesPromises = images.map(async (image) => {
@@ -151,6 +153,7 @@ works.put('/:id', authMiddleware, async (c) => {
         const work: WorkDTO = {
             date: data.get('date')!.toString(),
             description: data.get('description')!.toString(),
+            link: data.get('link')!.toString(),
             title: data.get('title')!.toString(),
         };
         const images: ImageDTO[] = JSON.parse(data.get('images')!.toString());
@@ -159,12 +162,12 @@ works.put('/:id', authMiddleware, async (c) => {
             UPDATE 
                 works 
             SET 
-                date = $1, description = $2, title = $3 
+                date = $1, description = $2, link = $3, title = $4 
             WHERE 
-                id = $4 
+                id = $5 
             RETURNING 
                 id;`,
-            [work.date, work.description, work.title, id]
+            [work.date, work.description, work.link, work.title, id]
         );
         
         const worksImagesResults = await pool.query(`
@@ -246,9 +249,7 @@ works.delete('/:id', authMiddleware, async (c) => {
     const pool: Pool = c.get('db');
     const id = c.req.param('id');
 
-
     try {
-
         const checkWork = await pool.query(`
             SELECT id FROM works WHERE id = $1;`,
             [id]);
