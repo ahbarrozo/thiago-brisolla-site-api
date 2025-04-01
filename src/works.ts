@@ -2,35 +2,35 @@ import { Hono } from 'hono';
 import { Pool } from 'pg';
 import { AppVariables } from './types/hono.types';
 import { Image, ImageDTO } from './types/Image.type';
-import { Album, AlbumDTO } from './types/Album.type';
+import { Work, WorkDTO } from './types/Work.type';
 import { authMiddleware } from './auth';
 
-const albums = new Hono<{ Variables: AppVariables }>();
+const works = new Hono<{ Variables: AppVariables }>();
 
 /**
- *  GET all album while joining all the images associated
+ *  GET all works while joining all the images associated
  *  with them and ordering by post date. Then the result is 
  *  parsed to include all images in a single array inside the 
  *  images attribute.
  */
-albums.get('/', async (c) => {
+works.get('/', async (c) => {
     const pool: Pool = c.get('db');
 
     try {
         const result = await pool.query(`
             SELECT 
-                al.id, al.date, al.description, al.title,  
+                wk.id, wk.date, wk.description, wk.title,  
                 im.id AS image_id, im.path AS image_path,
                 im.title AS image_title, im.description AS image_description 
             FROM 
-                albums al
+                works wk
             LEFT JOIN
-                albums_images ali ON al.id = ali.album_id
+                works_images wki ON wk.id = wki.work_id
             LEFT JOIN
-                images im ON ali.image_id = im.id;
+                images im ON wki.image_id = im.id;
         `);
 
-        const albums = result.rows.reduce((rows, row) => {
+        const works = result.rows.reduce((rows, row) => {
             const image: Image | null = row.image_id ? 
             {
                 id: row.image_id,
@@ -39,13 +39,13 @@ albums.get('/', async (c) => {
                 title: row.image_title
             } : null;
 
-            const existingAlbum: Album = rows.find((r: Album) => r.id === row.id);
+            const existingWork: Work = rows.find((r: Work) => r.id === row.id);
 
-            if (existingAlbum) {
+            if (existingWork) {
                 if (image)
-                    existingAlbum.images.push(image);
+                    existingWork.images.push(image);
             } else {
-                const album: Album = {
+                const work: Work = {
                     id: row.id,
                     date: row.date,
                     description: row.description,
@@ -54,45 +54,45 @@ albums.get('/', async (c) => {
                 }
 
                 if (image)
-                    album.images.push(image);
+                    work.images.push(image);
 
-                rows.push(album);
+                rows.push(work);
             }
             return rows;
         }, []);
 
-        return c.json(albums, 200);
+        return c.json(works, 200);
     } catch (error) {
         console.error('Database error: ', error);
-        return c.json({ error: 'Failed to fetch albums.'}, 500);
+        return c.json({ error: 'Failed to fetch works.'}, 500);
     }
 });
 
 /**
- *  POST request to create a new album entry. It will insert the 
- *  new rows at the albums, album_images and images tables
+ *  POST request to create a new work entry. It will insert the 
+ *  new rows at the works, work_images and images tables
  */
-albums.post('/', authMiddleware, async (c) => {
+works.post('/', authMiddleware, async (c) => {
     const pool: Pool = c.get('db');
 
     try {
         const data = await c.req.formData();
-        const album: AlbumDTO = {
+        const work: WorkDTO = {
             date: data.get('date')!.toString(),
             description: data.get('description')!.toString(),
             title: data.get('title')!.toString(),
         };
         const images: ImageDTO[] = JSON.parse(data.get('images')!.toString());
-        const albumQuery = await pool.query(`
+        const workQuery = await pool.query(`
             INSERT INTO 
-                albums (date, description, title)
+                works (date, description, title)
             VALUES 
                 ($1, $2, $3)
             RETURNING 
                 id;`,
-            [album.date, album.description, album.title]
+            [work.date, work.description, work.title]
         );
-        const albumId = albumQuery.rows[0].id
+        const workId = workQuery.rows[0].id
         const resultImagesPromises = images.map(async (image) => {
             const result = await pool.query(`
                 INSERT INTO 
@@ -110,45 +110,45 @@ albums.post('/', authMiddleware, async (c) => {
         resultImages.forEach(async (imageId) => {
             await pool.query(`
                 INSERT INTO 
-                    albums_images (album_id, image_id)
+                    works_images (work_id, image_id)
                 VALUES 
                     ($1, $2);`,
-                [albumId, imageId]);
+                [workId, imageId]);
         });
 
         return c.json(resultImages, 201);
     } catch (error) {
         console.error('Database error: ', error);
-        return c.json({ error: 'Failed to insert new album into DB'}, 500);
+        return c.json({ error: 'Failed to insert new work into DB'}, 500);
     }
 });
 
 /**
- *  PUT request to update an album based on its ID. It will 
+ *  PUT request to update an work based on its ID. It will 
  *  check its existence, fetch images associated with it, and update 
  *  all the fields available at the submission form, images included, 
  *  if needed
  */
-albums.put('/:id', authMiddleware, async (c) => {
+works.put('/:id', authMiddleware, async (c) => {
     const pool: Pool = c.get('db');
     const id = c.req.param('id');
 
     try {
-        const checkAlbum = await pool.query(`
+        const checkWork = await pool.query(`
             SELECT 
                 id 
             FROM 
-                albums 
+                works 
             WHERE 
                 id = $1;`,
             [id]);
 
-        if(checkAlbum.rows.length === 0) {
-            return c.json({ error: 'album not found' }, 404);
+        if(checkWork.rows.length === 0) {
+            return c.json({ error: 'Work not found' }, 404);
         }
 
         const data = await c.req.formData();
-        const album: AlbumDTO = {
+        const work: WorkDTO = {
             date: data.get('date')!.toString(),
             description: data.get('description')!.toString(),
             title: data.get('title')!.toString(),
@@ -157,31 +157,31 @@ albums.put('/:id', authMiddleware, async (c) => {
 
         await pool.query(`
             UPDATE 
-                albums 
+                works 
             SET 
                 date = $1, description = $2, title = $3 
             WHERE 
                 id = $4 
             RETURNING 
                 id;`,
-            [album.date, album.description, album.title, id]
+            [work.date, work.description, work.title, id]
         );
         
-        const albumsImagesResults = await pool.query(`
+        const worksImagesResults = await pool.query(`
             SELECT 
-                ali.image_id, ali.album_id, 
+                wki.image_id, wki.work_id, 
                 im.id, im.path, im.description, im.title 
             FROM 
-                albums_images ali
+                works_images wki
             LEFT JOIN 
-                images im ON im.id = ali.image_id
+                images im ON im.id = wki.image_id
             WHERE 
-                ali.album_id = $1;`,
+                wki.work_id = $1;`,
             [id]
         );
 
         // separating between images to be deleted and upserted
-        const imagesToDelete = albumsImagesResults.
+        const imagesToDelete = worksImagesResults.
                                rows.filter(im => 
                                    !(images.map(i => i.id)).includes(im.image_id)
                                );
@@ -192,9 +192,9 @@ albums.put('/:id', authMiddleware, async (c) => {
         imagesToDelete.forEach(async (im) => {
             await pool.query(`
                 DELETE FROM 
-                    albums_images 
+                    works_images 
                 WHERE 
-                    album_id = $1 AND image_id = $2`, 
+                    work_id = $1 AND image_id = $2`, 
                 [id, im.id]);
         });
 
@@ -212,7 +212,7 @@ albums.put('/:id', authMiddleware, async (c) => {
 
                 await pool.query(`
                     INSERT INTO 
-                        albums_images (album_id, image_id) 
+                        works_images (work_id, image_id) 
                     VALUES
                         ($1, $2);`, 
                     [id, result.rows[0].id]);
@@ -234,50 +234,50 @@ albums.put('/:id', authMiddleware, async (c) => {
             return result.rows[0].id;
         });
 
-        return c.json({ message: `Album ${id} updated successfully` }, 200);
+        return c.json({ message: `Work ${id} updated successfully` }, 200);
     } catch (error) {
         console.error('Database error: ', error);
-        return c.json({ error: 'Failed to insert new album into DB'}, 500);
+        return c.json({ error: 'Failed to insert new work into DB'}, 500);
     }
 });
 
-// DELETE request to delete an album based on its ID
-albums.delete('/:id', authMiddleware, async (c) => {
+// DELETE request to delete a work based on its ID
+works.delete('/:id', authMiddleware, async (c) => {
     const pool: Pool = c.get('db');
     const id = c.req.param('id');
 
 
     try {
 
-        const checkAlbum = await pool.query(`
-            SELECT id FROM albums WHERE id = $1;`,
+        const checkWork = await pool.query(`
+            SELECT id FROM works WHERE id = $1;`,
             [id]);
-        const checkAlbumImages = await pool.query(`
-            SELECT album_id FROM albums_images WHERE album_id = $1;`,
+        const checkWorkImages = await pool.query(`
+            SELECT work_id FROM works_images WHERE work_id = $1;`,
             [id]);
 
-        if(checkAlbum.rows.length === 0) {
-            return c.json({ error: 'album not found' }, 404);
+        if(checkWork.rows.length === 0) {
+            return c.json({ error: 'Work not found' }, 404);
         }
 
-        if(checkAlbumImages.rows.length > 0) {
+        if(checkWorkImages.rows.length > 0) {
             await pool.query(`
-                DELETE FROM albums_images WHERE album_id = $1`, 
+                DELETE FROM works_images WHERE work_id = $1`, 
                 [id]);
         }
 
-        const resultAlbum = await pool.query(`
-            DELETE FROM albums WHERE id = $1 RETURNING id`, 
+        const resultWork = await pool.query(`
+            DELETE FROM works WHERE id = $1 RETURNING id`, 
             [id]);
 
         return c.json({
-            message: 'Album deleted successfully',
-            id: resultAlbum.rows[0].id
+            message: 'Work deleted successfully',
+            id: resultWork.rows[0].id
         }, 200);
     } catch (error) {
-        console.error('Error deleting album: ', error);
-        return c.json({ error: 'Failed to delete album' }, 500)
+        console.error('Error deleting work: ', error);
+        return c.json({ error: 'Failed to delete work' }, 500)
     }
 });
 
-export default albums;
+export default works;

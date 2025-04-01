@@ -1,6 +1,6 @@
 import { Image } from './Image.type';
 
-export interface Album {
+export interface Work {
     id: number;
     date: string;
     description: string;
@@ -8,7 +8,7 @@ export interface Album {
     images: Image[];
 }
 
-export interface AlbumDTO {
+export interface WorkDTO {
     date: string;
     description: string;
     title: string;

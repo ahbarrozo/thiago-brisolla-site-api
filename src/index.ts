@@ -4,12 +4,12 @@ import { Pool } from 'pg';
 
 import { AppVariables } from './types/hono.types';
 import aboutSections from './aboutSections';
-import albums from './albums';
 import auth from './auth';
 import blogPosts from './blogPosts';
 import contacts from './contacts';
 import events from './events';
 import socialMedia from './socialMedia';
+import works from './works';
 
 const pool = new Pool({
     user: Bun.env.DB_USER,
@@ -35,12 +35,12 @@ app.use('*', cors({
 }));
 
 app.route('/about_sections', aboutSections);
-app.route('/albums', albums);
 app.route('/auth', auth);
 app.route('/blog_posts', blogPosts);
 app.route('/contacts', contacts);
 app.route('/events', events);
 app.route('/social_media', socialMedia);
+app.route('/works', works);
 
 app.get('/', (c) => {
   return c.text('API connection established!')
